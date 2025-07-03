@@ -1,24 +1,149 @@
 // The exported code uses Tailwind CSS. Install Tailwind CSS in your dev environment to ensure all styles work.
 import React, { useState } from 'react';
-const App: React.FC = () => {
-const [email, setEmail] = useState('');
-const [activeCategory, setActiveCategory] = useState('all');
-const [isMenuOpen, setIsMenuOpen] = useState(false);
-const [cartItems, setCartItems] = useState<number>(0);
-const [showToast, setShowToast] = useState(false);
-const [selectedProduct, setSelectedProduct] = useState<{
-  name: string;
-  price: string;
-  image: string;
-} | null>(null);
+import ProductListingsPage from './ProductListingsPage';
+import ShoppingCartPage, { CartItem } from './ShoppingCartPage';
+import ProductDetailPage from './ProductDetailPage';
+import ShippingPage, { ShippingFormData } from './ShippingPage';
+import PaymentPage, { PaymentFormData } from './PaymentPage';
+import OrderConfirmationPage from './OrderConfirmationPage';
+import AuthPage, { User } from './AuthPage';
+import OrderHistoryPage from './OrderHistoryPage';
+import AccountManagementPage from './AccountManagementPage';
+import AboutUsPage from './AboutUsPage';
+import ContactUsPage from './ContactUsPage';
+import FAQPage from './FAQPage';
+import TermsOfServicePage from './TermsOfServicePage'; // Import TermsOfServicePage
+import PrivacyPolicyPage from './PrivacyPolicyPage'; // Import PrivacyPolicyPage
 
-const handleAddToCart = (product: { name: string; price: string; image: string }) => {
-  setCartItems(prev => prev + 1);
-  setSelectedProduct(product);
-  setShowToast(true);
-  setTimeout(() => setShowToast(false), 3000);
-};
-const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+type PageView = 'home' | 'products' | 'cart' | 'productDetail' | 'shipping' | 'payment' | 'confirmation' | 'auth' | 'accountManagement' | 'orderHistory' | 'about' | 'contact' | 'faq' | 'terms' | 'privacy';
+
+// Interface for Product (can be moved to a types.ts file later)
+export interface Product {
+  id: string;
+  name: string;
+  price: string; // Keep as string for display, convert for cart logic
+  image: string;
+  images?: string[];
+  description?: string;
+  category?: string;
+}
+
+const App: React.FC = () => {
+  const [email, setEmail] = useState('');
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [cart, setCart] = useState<CartItem[]>([]); // Changed from number to CartItem[]
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState(''); // For dynamic toast messages
+  const [currentPage, setCurrentPage] = useState<PageView>('home');
+  const [selectedProductForDetail, setSelectedProductForDetail] = useState<Product | null>(null);
+  const [shippingDetails, setShippingDetails] = useState<ShippingFormData | null>(null);
+  const [paymentDetails, setPaymentDetails] = useState<PaymentFormData | null>(null); // State for payment data
+  const [currentUser, setCurrentUser] = useState<User | null>(null); // State for current user
+
+
+  const handleAddToCart = (productToAdd: Product) => {
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.id === productToAdd.id);
+      if (existingItem) {
+        return prevCart.map(item =>
+          item.id === productToAdd.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      } else {
+        // Convert price string (e.g., "₹58,000") to number
+        const priceAsNumber = parseFloat(productToAdd.price.replace('₹', '').replace(',', ''));
+        return [...prevCart, { ...productToAdd, price: priceAsNumber, quantity: 1 }];
+      }
+    });
+    setToastMessage(`${productToAdd.name} added to cart!`);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const handleUpdateCartQuantity = (productId: string, newQuantity: number) => {
+    setCart(prevCart =>
+      prevCart.map(item =>
+        item.id === productId ? { ...item, quantity: newQuantity } : item
+      ).filter(item => item.quantity > 0) // Remove if quantity becomes 0
+    );
+  };
+
+  const handleRemoveFromCart = (productId: string) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== productId));
+    setToastMessage(`Item removed from cart.`);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
+
+  const handleSubmitShipping = (data: ShippingFormData) => {
+    setShippingDetails(data);
+    console.log("Shipping Details submitted in App:", data);
+    navigateTo('payment'); // Navigate to the next step (Payment Page)
+  };
+
+  const handleSubmitPayment = (data: PaymentFormData) => {
+    setPaymentDetails(data); // Store dummy payment data
+    console.log("Payment Details submitted (dummy):", data);
+    // In a real app, you would process payment here
+    // Then, if successful:
+    navigateTo('confirmation');
+  };
+
+  const handleClearCart = () => {
+    setCart([]);
+    // Maybe also clear shipping/payment details if needed
+    // setShippingDetails(null);
+    // setPaymentDetails(null);
+  };
+
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    setToastMessage(`Welcome back, ${user.name}!`);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+    navigateTo('home'); // Or 'accountManagement'
+  };
+
+  const handleRegister = (user: User) => {
+    setCurrentUser(user); // Auto-login after registration for this simulation
+    setToastMessage(`Welcome, ${user.name}! Your account has been created.`);
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+    navigateTo('home'); // Or 'accountManagement'
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setToastMessage("You have been logged out.");
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+    navigateTo('home');
+  };
+
+  const handleUpdateUserProfile = (updatedData: Partial<User>) => {
+    if (currentUser) {
+      const updatedUser = { ...currentUser, ...updatedData };
+      setCurrentUser(updatedUser);
+      setToastMessage("Profile updated successfully!");
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+      // console.log("Updated user profile:", updatedUser);
+    }
+  };
+
+  const navigateTo = (page: PageView, product?: Product) => {
+    setCurrentPage(page);
+    if (page === 'productDetail' && product) {
+      setSelectedProductForDetail(product);
+    } else if (page !== 'productDetail') { // Clear selection if not navigating to product detail
+      setSelectedProductForDetail(null);
+    }
+    // Could add logic here to clear shippingDetails if navigating away from checkout etc.
+  };
+
+  const cartItemCount = cart.reduce((count, item) => count + item.quantity, 0);
+
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 setEmail(e.target.value);
 };
 const handleSubmit = (e: React.FormEvent) => {
@@ -41,34 +166,65 @@ onClick={() => setIsMenuOpen(!isMenuOpen)}
 <i className="fas fa-bars text-xl"></i>
 </button>
 <div className="hidden lg:flex space-x-6">
-<a href="#" className="text-sm hover:text-gold-600 transition-colors duration-300 cursor-pointer whitespace-nowrap">BRIDAL</a>
-<a href="#" className="text-sm hover:text-gold-600 transition-colors duration-300 cursor-pointer whitespace-nowrap">FESTIVE</a>
-<a href="#" className="text-sm hover:text-gold-600 transition-colors duration-300 cursor-pointer whitespace-nowrap">INDO-WESTERN</a>
+  <button onClick={() => navigateTo('products')} className="text-sm hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer whitespace-nowrap">BRIDAL</button>
+  <button onClick={() => navigateTo('products')} className="text-sm hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer whitespace-nowrap">FESTIVE</button>
+  <button onClick={() => navigateTo('products')} className="text-sm hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer whitespace-nowrap">INDO-WESTERN</button>
 </div>
 </div>
 <div className="lg:w-1/3 flex justify-center">
-<a href="#" className="font-serif text-2xl md:text-3xl font-bold cursor-pointer">
+{/* Make logo clickable to navigate home */}
+<button onClick={() => navigateTo('home')} className="font-serif text-2xl md:text-3xl font-bold cursor-pointer">
 Suhani Kapoor Designs
-</a>
+</button>
 </div>
-<div className="lg:w-1/3 flex justify-end space-x-4">
-<a href="#" className="cursor-pointer">
+<div className="lg:w-1/3 flex justify-end space-x-4 items-center"> {/* Added items-center */}
+<button className="cursor-pointer"> {/* Changed to button for potential future search modal */}
 <i className="fas fa-search text-lg"></i>
-</a>
-<a href="#" className="cursor-pointer">
-<i className="fas fa-user text-lg"></i>
-</a>
-<a href="#" className="cursor-pointer">
+</button>
+
+{currentUser ? (
+  <div className="relative group">
+    <button onClick={() => navigateTo('accountManagement')} className="cursor-pointer">
+      <i className="fas fa-user-circle text-2xl text-[#D4AF37]"></i> {/* Changed icon for logged in user */}
+    </button>
+    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 hidden group-hover:block">
+      <p className="px-4 py-2 text-sm text-gray-700">Hi, {currentUser.name.split(' ')[0]}</p>
+      <button
+        onClick={() => navigateTo('accountManagement')}
+        className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-[#D4AF37]"
+      >
+        My Account
+      </button>
+      <button
+        onClick={() => navigateTo('orderHistory')}
+        className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-[#D4AF37]"
+      >
+        Order History
+      </button>
+      <button
+        onClick={handleLogout}
+        className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-[#D4AF37]"
+      >
+        Logout
+      </button>
+    </div>
+  </div>
+) : (
+  <button onClick={() => navigateTo('auth')} className="cursor-pointer">
+    <i className="fas fa-user text-lg"></i>
+  </button>
+)}
+<button className="cursor-pointer"> {/* Changed to button */}
 <i className="fas fa-heart text-lg"></i>
 </a>
-<a href="#" className="cursor-pointer relative">
+<button onClick={() => navigateTo('cart')} className="cursor-pointer relative">
 <i className="fas fa-shopping-bag text-lg"></i>
-{cartItems > 0 && (
+{cartItemCount > 0 && (
   <span className="absolute -top-2 -right-2 bg-[#D4AF37] text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-    {cartItems}
+    {cartItemCount}
   </span>
 )}
-</a>
+</button>
 </div>
 </div>
 </div>
@@ -76,12 +232,12 @@ Suhani Kapoor Designs
 <div className={`lg:hidden ${isMenuOpen ? 'block' : 'hidden'} bg-white shadow-md absolute w-full`}>
 <div className="container mx-auto px-4 py-4">
 <ul className="space-y-4">
-<li><a href="#" className="block py-2 hover:text-gold-600 transition-colors duration-300 cursor-pointer">BRIDAL</a></li>
-<li><a href="#" className="block py-2 hover:text-gold-600 transition-colors duration-300 cursor-pointer">FESTIVE</a></li>
-<li><a href="#" className="block py-2 hover:text-gold-600 transition-colors duration-300 cursor-pointer">INDO-WESTERN</a></li>
-<li><a href="#" className="block py-2 hover:text-gold-600 transition-colors duration-300 cursor-pointer">NEW ARRIVALS</a></li>
-<li><a href="#" className="block py-2 hover:text-gold-600 transition-colors duration-300 cursor-pointer">CUSTOM ORDERS</a></li>
-<li><a href="#" className="block py-2 hover:text-gold-600 transition-colors duration-300 cursor-pointer">CONTACT</a></li>
+  <li><button onClick={() => { navigateTo('products'); setIsMenuOpen(false); }} className="block py-2 hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer w-full text-left">BRIDAL</button></li>
+  <li><button onClick={() => { navigateTo('products'); setIsMenuOpen(false); }} className="block py-2 hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer w-full text-left">FESTIVE</button></li>
+  <li><button onClick={() => { navigateTo('products'); setIsMenuOpen(false); }} className="block py-2 hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer w-full text-left">INDO-WESTERN</button></li>
+  <li><button onClick={() => { navigateTo('products'); setIsMenuOpen(false); }} className="block py-2 hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer w-full text-left">NEW ARRIVALS</button></li>
+  <li><button onClick={() => { navigateTo('contact'); setIsMenuOpen(false); }} className="block py-2 hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer w-full text-left">CUSTOM ORDERS</button></li>
+  <li><button onClick={() => { navigateTo('contact'); setIsMenuOpen(false); }} className="block py-2 hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer w-full text-left">CONTACT</button></li>
 </ul>
 </div>
 </div>
@@ -103,12 +259,12 @@ Timeless Elegance, <br />Contemporary Design
 <p className="text-white text-lg md:text-xl mb-8">
 Discover our handcrafted luxury ethnic wear for the modern woman
 </p>
-<a
-href="#"
+<button
+onClick={() => setCurrentPage('products')}
 className="inline-block bg-[#D4AF37] text-white px-8 py-3 font-medium !rounded-button hover:bg-[#B8860B] transition-colors duration-300 cursor-pointer whitespace-nowrap"
 >
 Shop the Collection
-</a>
+</button>
 </div>
 </div>
 </section>
@@ -207,317 +363,87 @@ Indo-Western
 </div>
 </div>
 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8">
-{/* Product Card 1 */}
-<div className="group">
-<div className="relative overflow-hidden rounded-lg mb-4">
-<span className="absolute top-4 left-4 bg-[#D4AF37] text-white text-xs px-3 py-1 rounded-full z-10">Made to Order</span>
-<img
-src="https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20blush%20pink%20lehenga%20with%20gold%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=5&orientation=portrait"
-alt="Blush Pink Embroidered Lehenga"
-className="w-full h-[400px] object-cover object-top transition-transform duration-500 group-hover:scale-110"
-/>
-<div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-eye"></i>
-</button>
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-heart"></i>
-</button>
-</div>
-</div>
-<h3 className="font-serif text-lg font-medium mb-1">Blush Pink Embroidered Lehenga</h3>
-<p className="text-[#D4AF37] font-medium mb-2">₹58,000</p>
-<button 
-  onClick={() => handleAddToCart({
-    name: "Blush Pink Embroidered Lehenga",
-    price: "₹58,000",
-    image: "https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20blush%20pink%20lehenga%20with%20gold%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=5&orientation=portrait"
-  })}
-  className="w-full bg-gray-100 text-gray-800 py-2 !rounded-button hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer whitespace-nowrap"
->
-  Add to Cart
-</button>
-
-{/* Toast Notification */}
-{showToast && selectedProduct && (
-  <div className="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-4 w-80 animate-slide-in-right z-50">
-    <div className="flex items-start space-x-4">
-      <img 
-        src={selectedProduct.image} 
-        alt={selectedProduct.name}
-        className="w-20 h-20 object-cover rounded"
-      />
-      <div className="flex-1">
-        <h4 className="font-medium text-sm mb-1">{selectedProduct.name}</h4>
-        <p className="text-[#D4AF37] text-sm mb-2">{selectedProduct.price}</p>
-        <button 
-          onClick={() => setShowToast(false)}
-          className="text-white bg-[#D4AF37] px-4 py-1 text-sm !rounded-button hover:bg-[#B8860B] transition-colors duration-300"
-        >
-          View Cart
-        </button>
-      </div>
-      <button 
-        onClick={() => setShowToast(false)}
-        className="text-gray-400 hover:text-gray-600"
-      >
-        <i className="fas fa-times"></i>
-      </button>
-    </div>
-  </div>
-)}
-</div>
-{/* Product Card 2 */}
-<div className="group">
-<div className="relative overflow-hidden rounded-lg mb-4">
-<span className="absolute top-4 left-4 bg-[#4CAF50] text-white text-xs px-3 py-1 rounded-full z-10">Ready to Ship</span>
-<img
-src="https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20ivory%20and%20gold%20anarkali%20suit%20with%20intricate%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=6&orientation=portrait"
-alt="Ivory Gold Anarkali Suit"
-className="w-full h-[400px] object-cover object-top transition-transform duration-500 group-hover:scale-110"
-/>
-<div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-eye"></i>
-</button>
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-heart"></i>
-</button>
-</div>
-</div>
-<h3 className="font-serif text-lg font-medium mb-1">Ivory Gold Anarkali Suit</h3>
-<p className="text-[#D4AF37] font-medium mb-2">₹42,500</p>
-<button 
-  onClick={() => handleAddToCart({
-    name: "Blush Pink Embroidered Lehenga",
-    price: "₹58,000",
-    image: "https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20blush%20pink%20lehenga%20with%20gold%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=5&orientation=portrait"
-  })}
-  className="w-full bg-gray-100 text-gray-800 py-2 !rounded-button hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer whitespace-nowrap"
->
-  Add to Cart
-</button>
-
-{/* Toast Notification */}
-{showToast && selectedProduct && (
-  <div className="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-4 w-80 animate-slide-in-right z-50">
-    <div className="flex items-start space-x-4">
-      <img 
-        src={selectedProduct.image} 
-        alt={selectedProduct.name}
-        className="w-20 h-20 object-cover rounded"
-      />
-      <div className="flex-1">
-        <h4 className="font-medium text-sm mb-1">{selectedProduct.name}</h4>
-        <p className="text-[#D4AF37] text-sm mb-2">{selectedProduct.price}</p>
-        <button 
-          onClick={() => setShowToast(false)}
-          className="text-white bg-[#D4AF37] px-4 py-1 text-sm !rounded-button hover:bg-[#B8860B] transition-colors duration-300"
-        >
-          View Cart
-        </button>
-      </div>
-      <button 
-        onClick={() => setShowToast(false)}
-        className="text-gray-400 hover:text-gray-600"
-      >
-        <i className="fas fa-times"></i>
-      </button>
-    </div>
-  </div>
-)}
-</div>
-{/* Product Card 3 */}
-<div className="group">
-<div className="relative overflow-hidden rounded-lg mb-4">
-<span className="absolute top-4 left-4 bg-[#D4AF37] text-white text-xs px-3 py-1 rounded-full z-10">Made to Order</span>
-<img
-src="https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20deep%20maroon%20saree%20with%20gold%20border%20and%20intricate%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=7&orientation=portrait"
-alt="Maroon Embroidered Saree"
-className="w-full h-[400px] object-cover object-top transition-transform duration-500 group-hover:scale-110"
-/>
-<div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-eye"></i>
-</button>
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-heart"></i>
-</button>
-</div>
-</div>
-<h3 className="font-serif text-lg font-medium mb-1">Maroon Embroidered Saree</h3>
-<p className="text-[#D4AF37] font-medium mb-2">₹36,000</p>
-<button 
-  onClick={() => handleAddToCart({
-    name: "Blush Pink Embroidered Lehenga",
-    price: "₹58,000",
-    image: "https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20blush%20pink%20lehenga%20with%20gold%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=5&orientation=portrait"
-  })}
-  className="w-full bg-gray-100 text-gray-800 py-2 !rounded-button hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer whitespace-nowrap"
->
-  Add to Cart
-</button>
-
-{/* Toast Notification */}
-{showToast && selectedProduct && (
-  <div className="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-4 w-80 animate-slide-in-right z-50">
-    <div className="flex items-start space-x-4">
-      <img 
-        src={selectedProduct.image} 
-        alt={selectedProduct.name}
-        className="w-20 h-20 object-cover rounded"
-      />
-      <div className="flex-1">
-        <h4 className="font-medium text-sm mb-1">{selectedProduct.name}</h4>
-        <p className="text-[#D4AF37] text-sm mb-2">{selectedProduct.price}</p>
-        <button 
-          onClick={() => setShowToast(false)}
-          className="text-white bg-[#D4AF37] px-4 py-1 text-sm !rounded-button hover:bg-[#B8860B] transition-colors duration-300"
-        >
-          View Cart
-        </button>
-      </div>
-      <button 
-        onClick={() => setShowToast(false)}
-        className="text-gray-400 hover:text-gray-600"
-      >
-        <i className="fas fa-times"></i>
-      </button>
-    </div>
-  </div>
-)}
-</div>
-{/* Product Card 4 */}
-<div className="group">
-<div className="relative overflow-hidden rounded-lg mb-4">
-<span className="absolute top-4 left-4 bg-[#4CAF50] text-white text-xs px-3 py-1 rounded-full z-10">Ready to Ship</span>
-<img
-src="https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20pastel%20blue%20indo-western%20outfit%20with%20pants%20and%20long%20jacket%20with%20gold%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=8&orientation=portrait"
-alt="Pastel Blue Indo-Western Set"
-className="w-full h-[400px] object-cover object-top transition-transform duration-500 group-hover:scale-110"
-/>
-<div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-eye"></i>
-</button>
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-heart"></i>
-</button>
-</div>
-</div>
-<h3 className="font-serif text-lg font-medium mb-1">Pastel Blue Indo-Western Set</h3>
-<p className="text-[#D4AF37] font-medium mb-2">₹48,500</p>
-<button 
-  onClick={() => handleAddToCart({
-    name: "Blush Pink Embroidered Lehenga",
-    price: "₹58,000",
-    image: "https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20blush%20pink%20lehenga%20with%20gold%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=5&orientation=portrait"
-  })}
-  className="w-full bg-gray-100 text-gray-800 py-2 !rounded-button hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer whitespace-nowrap"
->
-  Add to Cart
-</button>
-
-{/* Toast Notification */}
-{showToast && selectedProduct && (
-  <div className="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-4 w-80 animate-slide-in-right z-50">
-    <div className="flex items-start space-x-4">
-      <img 
-        src={selectedProduct.image} 
-        alt={selectedProduct.name}
-        className="w-20 h-20 object-cover rounded"
-      />
-      <div className="flex-1">
-        <h4 className="font-medium text-sm mb-1">{selectedProduct.name}</h4>
-        <p className="text-[#D4AF37] text-sm mb-2">{selectedProduct.price}</p>
-        <button 
-          onClick={() => setShowToast(false)}
-          className="text-white bg-[#D4AF37] px-4 py-1 text-sm !rounded-button hover:bg-[#B8860B] transition-colors duration-300"
-        >
-          View Cart
-        </button>
-      </div>
-      <button 
-        onClick={() => setShowToast(false)}
-        className="text-gray-400 hover:text-gray-600"
-      >
-        <i className="fas fa-times"></i>
-      </button>
-    </div>
-  </div>
-)}
-</div>
-{/* Product Card 5 */}
-<div className="group">
-<div className="relative overflow-hidden rounded-lg mb-4">
-<span className="absolute top-4 left-4 bg-[#D4AF37] text-white text-xs px-3 py-1 rounded-full z-10">Made to Order</span>
-<img
-src="https://static.readdy.ai/image/3f18ecdef7336876f3811b4515b1447b/57ba2092400d3f8aa2878fb0a35bafaf.png"
-alt="Floral Embroidered Midi Dress"
-className="w-full h-[400px] object-cover object-top transition-transform duration-500 group-hover:scale-110"
-/>
-<div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-eye"></i>
-</button>
-<button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
-<i className="fas fa-heart"></i>
-</button>
-</div>
-</div>
-<h3 className="font-serif text-lg font-medium mb-1">Floral Embroidered Midi Dress</h3>
-<p className="text-[#D4AF37] font-medium mb-2">₹45,000</p>
-<button 
-  onClick={() => handleAddToCart({
-    name: "Blush Pink Embroidered Lehenga",
-    price: "₹58,000",
-    image: "https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20blush%20pink%20lehenga%20with%20gold%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=5&orientation=portrait"
-  })}
-  className="w-full bg-gray-100 text-gray-800 py-2 !rounded-button hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer whitespace-nowrap"
->
-  Add to Cart
-</button>
-
-{/* Toast Notification */}
-{showToast && selectedProduct && (
-  <div className="fixed top-4 right-4 bg-white rounded-lg shadow-xl p-4 w-80 animate-slide-in-right z-50">
-    <div className="flex items-start space-x-4">
-      <img 
-        src={selectedProduct.image} 
-        alt={selectedProduct.name}
-        className="w-20 h-20 object-cover rounded"
-      />
-      <div className="flex-1">
-        <h4 className="font-medium text-sm mb-1">{selectedProduct.name}</h4>
-        <p className="text-[#D4AF37] text-sm mb-2">{selectedProduct.price}</p>
-        <button 
-          onClick={() => setShowToast(false)}
-          className="text-white bg-[#D4AF37] px-4 py-1 text-sm !rounded-button hover:bg-[#B8860B] transition-colors duration-300"
-        >
-          View Cart
-        </button>
-      </div>
-      <button 
-        onClick={() => setShowToast(false)}
-        className="text-gray-400 hover:text-gray-600"
-      >
-        <i className="fas fa-times"></i>
-      </button>
-    </div>
-  </div>
-)}
-</div>
-</div>
-<div className="text-center mt-12">
-<a
-href="#"
-className="inline-block border border-[#D4AF37] text-[#D4AF37] px-8 py-3 font-medium !rounded-button hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer whitespace-nowrap"
->
-View All Products
-</a>
+          {/* Sample Products for Home Page New Arrivals */}
+          {[
+            { id: 'home-prod-1', name: 'Blush Pink Embroidered Lehenga', price: '₹58,000', image: 'https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20blush%20pink%20lehenga%20with%20gold%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=5', category: 'Bridal', description: 'A stunning blush pink lehenga with intricate gold embroidery, perfect for the modern bride.' },
+            { id: 'home-prod-2', name: 'Ivory Gold Anarkali Suit', price: '₹42,500', image: 'https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20ivory%20and%20gold%20anarkali%20suit%20with%20intricate%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=6', category: 'Festive', description: 'An elegant ivory and gold Anarkali suit, ideal for festive occasions.' },
+            { id: 'home-prod-3', name: 'Maroon Embroidered Saree', price: '₹36,000', image: 'https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20deep%20maroon%20saree%20with%20gold%20border%20and%20intricate%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=7', category: 'Bridal', description: 'A rich maroon saree with beautiful gold embroidery, a timeless classic.' },
+            { id: 'home-prod-4', name: 'Pastel Blue Indo-Western Set', price: '₹48,500', image: 'https://readdy.ai/api/search-image?query=Elegant%20Indian%20woman%20wearing%20a%20luxurious%20pastel%20blue%20indo-western%20outfit%20with%20pants%20and%20long%20jacket%20with%20gold%20embroidery%2C%20professional%20fashion%20photography%20with%20soft%20lighting%2C%20minimalist%20background%2C%20high-end%20ethnic%20wear%2C%20detailed%20craftsmanship%20visible%2C%20front%20view%20of%20the%20outfit&width=400&height=500&seq=8', category: 'Indo-Western', description: 'A chic pastel blue Indo-Western set, blending tradition with modern style.' },
+            { id: 'home-prod-5', name: 'Floral Embroidered Midi Dress', price: '₹45,000', image: 'https://static.readdy.ai/image/3f18ecdef7336876f3811b4515b1447b/57ba2092400d3f8aa2878fb0a35bafaf.png', category: 'Indo-Western', description: 'A beautiful floral embroidered midi dress, perfect for a sophisticated look.' },
+          ].map(product => (
+            <div key={product.id} className="group">
+              <div className="relative overflow-hidden rounded-lg mb-4">
+                {product.id.includes('home-prod-1') || product.id.includes('home-prod-3') || product.id.includes('home-prod-5') ? (
+                  <span className="absolute top-4 left-4 bg-[#D4AF37] text-white text-xs px-3 py-1 rounded-full z-10">Made to Order</span>
+                ) : (
+                  <span className="absolute top-4 left-4 bg-[#4CAF50] text-white text-xs px-3 py-1 rounded-full z-10">Ready to Ship</span>
+                )}
+                <img
+                  src={product.image}
+                  alt={product.name}
+                  className="w-full h-[400px] object-cover object-top transition-transform duration-500 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                  <button
+                    onClick={() => navigateTo('productDetail', product)}
+                    className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
+                    <i className="fas fa-eye"></i>
+                  </button>
+                  <button className="bg-white text-gray-800 p-3 rounded-full mx-2 hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer">
+                    <i className="fas fa-heart"></i>
+                  </button>
+                </div>
+              </div>
+              <h3 className="font-serif text-lg font-medium mb-1 truncate" title={product.name}>{product.name}</h3>
+              <p className="text-[#D4AF37] font-medium mb-2">{product.price}</p>
+              <button
+                onClick={() => handleAddToCart(product)}
+                className="w-full bg-gray-100 text-gray-800 py-2 !rounded-button hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer whitespace-nowrap"
+              >
+                Add to Cart
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="text-center mt-12">
+          <button
+            onClick={() => navigateTo('products')}
+            className="inline-block border border-[#D4AF37] text-[#D4AF37] px-8 py-3 font-medium !rounded-button hover:bg-[#D4AF37] hover:text-white transition-colors duration-300 cursor-pointer whitespace-nowrap"
+          >
+            View All Products
+          </button>
 </div>
 </div>
 </section>
+
+{/* Toast Notification - Global */}
+{showToast && (
+  <div className="fixed top-20 right-4 bg-white rounded-lg shadow-xl p-4 w-80 animate-slide-in-right z-[100]"> {/* Ensure high z-index, adjusted top */}
+    <div className="flex items-start space-x-3">
+      <div className="flex-1">
+        <p className="font-medium text-sm mb-2">{toastMessage}</p>
+        {toastMessage.includes("added to cart") && cart.length > 0 && ( // Check if cart is not empty
+          <button
+            onClick={() => {
+              navigateTo('cart');
+              setShowToast(false);
+            }}
+            className="text-white bg-[#D4AF37] px-3 py-1 text-xs !rounded-button hover:bg-[#B8860B] transition-colors duration-300"
+          >
+            View Cart ({cartItemCount})
+          </button>
+        )}
+      </div>
+      <button
+        onClick={() => setShowToast(false)}
+        className="text-gray-400 hover:text-gray-600"
+      >
+        <i className="fas fa-times"></i>
+      </button>
+    </div>
+  </div>
+)}
+
 {/* Custom Orders */}
 <section className="py-16 bg-[#F8F4E9]">
 <div className="container mx-auto px-4">
@@ -810,33 +736,37 @@ By subscribing, you agree to our Privacy Policy and consent to receive updates f
 <div>
 <h3 className="font-serif text-xl font-bold mb-4">Shop</h3>
 <ul className="space-y-2">
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Bridal Collection</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Festive Wear</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Indo-Western</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">New Arrivals</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Custom Orders</a></li>
+  <li><button onClick={() => navigateTo('products')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">All Products</button></li>
+  {/* These could also navigate to pre-filtered product pages if that logic is added */}
+  <li><button onClick={() => navigateTo('products')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Bridal Collection</button></li>
+  <li><button onClick={() => navigateTo('products')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Festive Wear</button></li>
+  <li><button onClick={() => navigateTo('products')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Indo-Western</button></li>
+  <li><button onClick={() => navigateTo('products')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">New Arrivals</button></li>
+  {/* Custom Orders could be a section on Contact Us or a dedicated page */}
+  <li><button onClick={() => navigateTo('contact')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Custom Orders</button></li>
 </ul>
 </div>
 {/* Customer Service */}
 <div>
 <h3 className="font-serif text-xl font-bold mb-4">Customer Service</h3>
 <ul className="space-y-2">
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Contact Us</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Shipping Policy</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Returns & Exchanges</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Size Guide</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">FAQs</a></li>
+  <li><button onClick={() => navigateTo('contact')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Contact Us</button></li>
+  <li><button onClick={() => navigateTo('terms')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Shipping Policy</button></li> {/* Placeholder, link to Terms or a new page */}
+  <li><button onClick={() => navigateTo('terms')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Returns & Exchanges</button></li> {/* Placeholder */}
+  <li><button onClick={() => navigateTo('faq')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Size Guide</button></li> {/* Placeholder, could be part of FAQ or Product Detail */}
+  <li><button onClick={() => navigateTo('faq')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">FAQs</button></li>
 </ul>
 </div>
 {/* About */}
 <div>
 <h3 className="font-serif text-xl font-bold mb-4">About</h3>
 <ul className="space-y-2">
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Our Story</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Craftsmanship</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Blog</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Press</a></li>
-<li><a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Careers</a></li>
+  <li><button onClick={() => navigateTo('about')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Our Story</button></li>
+  <li><button onClick={() => navigateTo('about')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer text-left w-full">Craftsmanship</button></li> {/* Could be section in About Us */}
+  {/* Blog, Press, Careers are out of scope for now, can be added later */}
+  <li><span className="text-gray-500 cursor-default">Blog (Coming Soon)</span></li>
+  <li><span className="text-gray-500 cursor-default">Press (Coming Soon)</span></li>
+  <li><span className="text-gray-500 cursor-default">Careers (Coming Soon)</span></li>
 </ul>
 </div>
 {/* Connect */}
@@ -873,14 +803,96 @@ Follow us on social media for the latest updates, styling inspiration, and behin
 &copy; {new Date().getFullYear()} Suhani Kapoor Designs. All rights reserved.
 </p>
 <div className="flex space-x-4 text-sm text-gray-400">
-<a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Privacy Policy</a>
-<span>|</span>
-<a href="#" className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Terms of Service</a>
+  <button onClick={() => navigateTo('privacy')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Privacy Policy</button>
+  <span>|</span>
+  <button onClick={() => navigateTo('terms')} className="hover:text-[#D4AF37] transition-colors duration-300 cursor-pointer">Terms of Service</button>
 </div>
 </div>
 </div>
 </div>
 </footer>
+</>
+)}
+{currentPage === 'products' && (
+  <ProductListingsPage
+    onNavigate={navigateTo}
+    onAddToCart={handleAddToCart}
+  />
+)}
+{currentPage === 'productDetail' && selectedProductForDetail && (
+  <ProductDetailPage
+    product={selectedProductForDetail}
+    onBackToListing={() => navigateTo('products')}
+    onAddToCart={handleAddToCart}
+  />
+)}
+{currentPage === 'cart' && (
+  <ShoppingCartPage
+    cartItems={cart}
+    onUpdateQuantity={handleUpdateCartQuantity}
+    onRemoveItem={handleRemoveFromCart}
+    onContinueShopping={() => navigateTo('products')}
+    onProceedToCheckout={() => navigateTo('shipping')} // Navigate to Shipping Page
+  />
+)}
+{currentPage === 'shipping' && (
+  <ShippingPage
+    onSubmitShipping={handleSubmitShipping}
+    onBackToCart={() => navigateTo('cart')}
+  />
+)}
+{currentPage === 'payment' && (
+  <PaymentPage
+    orderTotal={cart.reduce((total, item) => total + (item.price * item.quantity), 0)}
+    onSubmitPayment={handleSubmitPayment}
+    onBackToShipping={() => navigateTo('shipping')}
+  />
+)}
+{currentPage === 'confirmation' && shippingDetails && ( // Ensure shippingDetails exist
+  <OrderConfirmationPage
+    orderNumber={Date.now().toString()} // Simple unique enough order number for now
+    cartItems={cart} // Pass the cart as it was before clearing
+    shippingDetails={shippingDetails}
+    orderTotal={cart.reduce((total, item) => total + (item.price * item.quantity), 0)}
+    onContinueShopping={() => navigateTo('home')}
+    onClearCart={handleClearCart} // Pass the actual clear cart function
+  />
+)}
+{currentPage === 'auth' && (
+  <AuthPage onLogin={handleLogin} onRegister={handleRegister} />
+)}
+{currentPage === 'accountManagement' && currentUser && (
+  <AccountManagementPage
+    currentUser={currentUser}
+    onUpdateProfile={handleUpdateUserProfile}
+    onChangePassword={() => alert("Change password flow not implemented.")} // Placeholder
+  />
+)}
+{currentPage === 'orderHistory' && currentUser && (
+  <OrderHistoryPage
+    onNavigateToProduct={(productId) => {
+      console.log("Navigate to product from order history:", productId);
+      // Potentially find product and navigate:
+      // const productToView = [...homePageProducts, ...productListingsPageProducts].find(p => p.id === productId);
+      // if (productToView) navigateTo('productDetail', productToView);
+    }}
+  />
+)}
+{currentPage === 'about' && (
+  <AboutUsPage />
+)}
+{currentPage === 'contact' && (
+  <ContactUsPage />
+)}
+{currentPage === 'faq' && (
+  <FAQPage />
+)}
+{currentPage === 'terms' && (
+  <TermsOfServicePage />
+)}
+{currentPage === 'privacy' && (
+  <PrivacyPolicyPage />
+)}
 </div>
 );
 };
